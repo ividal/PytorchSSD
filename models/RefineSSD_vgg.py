@@ -47,7 +47,6 @@ class RefineSSD(nn.Module):
     See: https://arxiv.org/pdf/1512.02325.pdf for more details.
 
     Args:
-        phase: (string) Can be "test" or "train"
         base: VGG16 layers for input, size of either 300 or 500
         extras: extra layers that feed to multibox loc and conf layers
         head: "multibox head" consists of loc and conf conv layers

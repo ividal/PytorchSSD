@@ -130,7 +130,6 @@ class RFBNet(nn.Module):
     See: https://arxiv.org/pdf/1711.07767.pdf for more details on RFB Net.
 
     Args:
-        phase: (string) Can be "test" or "train"
         base: VGG16 layers for input, size of either 300 or 512
         extras: extra layers that feed to multibox loc and conf layers
         head: "multibox head" consists of loc and conf conv layers
