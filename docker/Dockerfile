@@ -7,23 +7,23 @@ RUN apt-get update --fix-missing &&\
         software-properties-common  \
         curl\
         htop \
-        git &&\
+        git \
+        libsm6 \
+        libxext6 \
+        libfontconfig1 \
+        libxrender1 &&\
     add-apt-repository ppa:deadsnakes/ppa &&\
     apt-get update --fix-missing &&\
     apt-get install -y \
         python3.6 \
         python3-dev \
-        python3.6-dev &&\   
+        python3.6-dev \
+        python3.6-tk &&\ 
     rm -rf /var/lib/apt/lists/* && \
     curl https://bootstrap.pypa.io/get-pip.py | python3.6 &&\
-    pip install -r /tmp/requirements.txt
+    pip install -r /tmp/requirements.txt 
 
-RUN cd /tmp/ && \
-    git clone -b temp/local-config https://github.com/ividal/PytorchSSD.git 
-    
-ENV CUDA_PATH=/usr/local/cuda
-
-RUN cd /tmp/PytorchSSD/utils &&\
-    python3.6 build.py build_ext --inplace
-RUN pip install git+https://github.com/szagoruyko/pyinn.git@master
+RUN pip install http://download.pytorch.org/whl/cu90/torch-0.3.0.post4-cp36-cp36m-linux_x86_64.whl \
+                torchvision \
+                git+https://github.com/szagoruyko/pyinn.git@master
 

@@ -1,0 +1,14 @@
+FROM pytorch:0.3-py36
+
+ENV SRC /tmp
+
+RUN cd $SRC && \
+    git clone -b temp/local-config https://github.com/ividal/PytorchSSD.git 
+ENV SSD $SRC/PytorchSSD
+    
+ENV CUDA_PATH=/usr/local/cuda
+
+RUN cd $SSD/utils &&\
+    python3.6 build.py build_ext --inplace
+
+WORKDIR $SSD
