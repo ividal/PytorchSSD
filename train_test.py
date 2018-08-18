@@ -12,6 +12,7 @@ import torch.nn.init as init
 import torch.optim as optim
 import torch.utils.data as data
 from torch.autograd import Variable
+import torch.onnx as onnx
 
 from data import VOCroot, COCOroot, VOC_300, VOC_512, COCO_300, COCO_512, COCO_mobile_300, AnnotationTransform, \
     COCODetection, VOCDetection, detection_collate, BaseTransform, preproc
@@ -43,7 +44,7 @@ parser.add_argument('--num_workers', default=4,
                     type=int, help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True,
                     type=bool, help='Use cuda to train model')
-parser.add_argument('--ngpu', default=2, type=int, help='gpus')
+parser.add_argument('--ngpu', default=1, type=int, help='gpus')
 parser.add_argument('--lr', '--learning-rate',
                     default=4e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
@@ -52,7 +53,7 @@ parser.add_argument('--resume_net', default=False, help='resume net for retraini
 parser.add_argument('--resume_epoch', default=0,
                     type=int, help='resume iter for retraining')
 
-parser.add_argument('-max', '--max_epoch', default=300,
+parser.add_argument('-max', '--max_epoch', default=10,
                     type=int, help='max epoch for retraining')
 parser.add_argument('--weight_decay', default=5e-4,
                     type=float, help='Weight decay for SGD')
@@ -64,8 +65,8 @@ parser.add_argument('--log_iters', default=True,
                     type=bool, help='Print the loss at each iteration')
 parser.add_argument('--save_folder', default='weights/',
                     help='Location to save checkpoint models')
-parser.add_argument('--date', default='1213')
-parser.add_argument('--save_frequency', default=10)
+parser.add_argument('--date', default='20180617')
+parser.add_argument('--save_frequency', default=2, type=int)
 parser.add_argument('--retest', default=False, type=bool,
                     help='test cache results')
 parser.add_argument('--test_frequency', default=10)
@@ -127,7 +128,7 @@ net = build_net(img_dim, num_classes)
 print(net)
 if not args.resume_net:
     base_weights = torch.load(args.basenet)
-    print('Loading base network...')
+    print('Loading base network...\nweights: {}'.format(args.basenet))
     net.base.load_state_dict(base_weights)
 
 
@@ -220,7 +221,7 @@ def train():
     epoch = 0
     if args.resume_net:
         epoch = 0 + args.resume_epoch
-    epoch_size = len(train_dataset) // args.batch_size
+    epoch_size = 10 #len(train_dataset) // args.batch_size
     max_iter = args.max_epoch * epoch_size
 
     stepvalues_VOC = (150 * epoch_size, 200 * epoch_size, 250 * epoch_size)
@@ -261,7 +262,7 @@ def train():
     mean_loss_c = 0
     mean_loss_l = 0
     for iteration in range(start_iter, max_iter + 10):
-        if (iteration % epoch_size == 0):
+        if iteration % epoch_size == 0:
             # create batch iterator
             batch_iterator = iter(data.DataLoader(train_dataset, batch_size,
                                                   shuffle=True, num_workers=args.num_workers,
@@ -269,8 +270,12 @@ def train():
             loc_loss = 0
             conf_loss = 0
             if epoch % args.save_frequency == 0 and epoch > 0:
-                torch.save(net.state_dict(), os.path.join(save_folder, args.version + '_' + args.dataset + '_epoches_' +
-                                                          repr(epoch) + '.pth'))
+                basename = os.path.join(save_folder, "{}_{}_epochs_{}".format(args.version, args.dataset, repr(epoch)))
+                torch.save(net.state_dict(), os.path.join("{}.pth".format(basename)))
+                dummy_input = torch.autograd.Variable(torch.FloatTensor(*(1, 3, int(args.size), int(args.size))), volatile=True)
+                onnx_file = os.path.join("{}.onnx".format(basename))
+                torch.onnx.export(net.cuda(), dummy_input.cuda(), onnx_file, export_params=True, verbose=True)
+
             if epoch % args.test_frequency == 0 and epoch > 0:
                 net.eval()
                 top_k = (300, 200)[args.dataset == 'COCO']
@@ -348,8 +353,11 @@ def train():
                 random_batch_index = np.random.randint(images.size(0))
                 viz.image(images.data[random_batch_index].cpu().numpy())
     log_file.close()
-    torch.save(net.state_dict(), os.path.join(save_folder,
-                                              'Final_' + args.version + '_' + args.dataset + '.pth'))
+    basename = 'Final_' + args.version + '_' + args.dataset
+    torch.save(net.state_dict(), os.path.join(save_folder, "{}.pth".format(basename)))
+    dummy_input = torch.autograd.Variable(torch.FloatTensor(*(1, 3, int(args.size), int(args.size))), volatile=True)
+    onnx_file = os.path.join(save_folder, "{}.onnx".format(basename))
+    torch.onnx.export(net.cuda(), dummy_input.cuda(), onnx_file, export_params=True, verbose=True)
 
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
